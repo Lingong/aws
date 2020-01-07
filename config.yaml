@@ -1,0 +1,38 @@
+# web服务
+web:
+  # 主机
+  host: localhost
+  # 端口
+  port: 8888
+  # static
+  static: static
+  # 文件保存目录
+  path: data
+
+mail:
+  # 邮箱密码密钥 必须为16位
+  seckey: abbccSdklslkddfs
+
+# token
+token:
+  # token key
+  secret_key: async.web
+  # token exp
+  exp: 3600
+
+# 数据库
+postgres:
+  # 数据库
+  database: awser
+  # 用户
+  user: lg
+  # 密码
+  password: a1s2d3
+  # 主机
+  host: localhost
+  # 端口
+  port: 5432
+  # 最小连接数
+  minsize: 1
+  # 最大连接数
+  maxsize: 5

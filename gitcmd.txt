@@ -1,0 +1,55 @@
+# 漂亮显示日志
+git log --pretty=oneline
+
+# 查看执行过的命令
+git reflog
+
+# 把文件加入git
+git add <file>
+
+# 文件提交
+git commit -m "message"
+
+# 查看分支
+git branch
+
+# 新建分支
+git branch <branch>
+
+# 推送文件至github
+git push
+
+# 从github更新文件
+git pull
+
+# 查看git状态
+git status
+
+# 初始化git
+git init
+
+# 版本回退至上一个版本
+git reset --hard HEAD^
+
+# 版本切换至指定commit id的版本
+git log --pretty=oneline # 找出要切换的commit id或者前几位就可以了
+git reset --hard <commid>
+
+# 把暂存区或者版本库版本恢复至工作区
+git checkout -- <file>
+
+# 把暂存区版本恢复至工作区
+git reset HEAD <file>
+
+# 删除版本库文件
+git rm <file>
+
+# 把本地库与github远程库关联
+git remote add origin git@github.com:<username>/<repository.git>
+git push -u origin master
+
+# 在Linux的~目录下创建ssh
+
+# 从远程库克隆之本地目录
+git clone git@github.com:<username>/<repository.git>
+
