@@ -1,15 +1,16 @@
 from web.config import getConfig
-from web.awser import Awser
+from web.aws import Aws
 from views import routes
 
 if __name__ == '__main__':
     # 导入配置
-    config = getConfig('config.yaml')
-    app = Awser()
+    config = loadConfig('config.yaml')
+    db = config.db
+    app = Aws()
     # 导入配置文件
     app.setup_config(config)
     # 导入数据库
-    app.setup_postgres(user=config.postgres.user, password=config.postgres.password)
+    app.setup_db(db.dbname, db.dbtype, db.host, db.port, db.user, db.password, db.minsize, db.maxsize)
     # 导入中间件
     app.setup_middleware(index='index.html', msg404='index.html')
     # 导入令牌

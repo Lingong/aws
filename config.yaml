@@ -21,9 +21,11 @@ token:
   exp: 3600
 
 # 数据库
-postgres:
-  # 数据库
-  database: awser
+db:
+  # 数据库名称
+  dbname: aws
+  # 数据库类型
+  dbtype: postgresql
   # 用户
   user: lg
   # 密码

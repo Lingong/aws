@@ -10,11 +10,11 @@
 import os
 from pathlib import Path
 from aiohttp import web
-from .db import init_pg,close_pg
+from .db import Database
 from .handler import Handler
 from .token import Token
 from .middleware import middleware_logger
-from .config import Config
+from .config import Config,getConfig
 
 class Aws(object):
     def __init__(self, host:str='127.0.0.1', port:int=8888):
@@ -29,15 +29,16 @@ class Aws(object):
         self._app['config'] = config
         print('setup config success')
 
-    def setup_postgres(self, database:str='awser', host:str='localhost',
-        port:int=5432, user:str=None, password:str=None, minsize:int=1, maxsize:int=5):
-        '''加载postgres数据库'''
+    def setup_db(self, dbnane:str='aws', dbtype:str='postgresql', host:str='localhost',
+        port:int=5432, user:str=None, password:str=None, minsize:int=1, maxsize:int=10):
+        '''加载数据库'''
         if user is None:
             raise ValueError('数据库用户不能为空')
         if password is None:
             raise ValueError('数据库密码不能为空')
-        postgres = {
-            'database': database,
+        db = {
+            'dbname': dbname,
+            'dbtype': dbtype,
             'host': host,
             'port': port,
             'user': user,
@@ -45,9 +46,9 @@ class Aws(object):
             'minsize': minsize,
             'maxsize': maxsize
         }
-        self._app['postgres'] = postgres
-        self._app.on_startup.append(init_pg)
-        self._app.on_cleanup.append(close_pg)
+        self._app['db'] = getConfig(db)
+        self._app.on_startup.append(Database.init_db)
+        self._app.on_cleanup.append(Database.close_db)
         print('setup databse success')
 
     def _get_html(self, file:str):

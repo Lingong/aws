@@ -1,16 +1,31 @@
 # --------------------------------------------------------------------------------
 # 文件：orm.py
 # 描述：该源码为数据库和对象的关联对应模块
-# 版本：0.1
+# 版本：1.7
 # 作者：lg
-# 日期：2020.01.15
-# 修改：2020.01.15 0.1 lg  新增版本
+# 日期：2016.11.11
+# 修改：2016.11.11 0.1 lg  新增版本
+#      2016.11.17 0.2 lg  修改connect的入口参数默认值，修改方法create,drop
+#      2016.11.19 0.3 lg  修改多个方法
+#      2016.11.19 0.4 lg  修改read
+#      2016.12.01 0.5 lg  修复create语句的BUG
+#      2016.12.04 0.6 lg  增加组合主键功能
+#      2017.02.06 0.7 lg  修改chain功能
+#      2017.02.08 0.8 lg  修改connect异常处理流程和修改execute_dml
+#      2017.02.22 0.9 lg  修复execute_dml,chain的bug
+#      2017.04.13 1.0 lg  修改read和chain方法，如果结果集为空时，返回None
+#      2017.04.19 1.1 lg  删除pypyodbc,增加类函数count,去除logging
+#      2017.04.22 1.2 lg  修改类Connect
+#      2017.05.04 1.3 lg  增加分页查询功能
+#      2017.05.23 1.4 lg  修复create方法的BUG
+#      2017.07.09 1.5 lg  为字段名增加[]，以便处理字段名为关键字的情况。
+#      2018.11.13 1.6 lg  修改execute_query，Connect，execute_dml异常处理模块
+#      2020.01.08 1.7 lg  分离数据库sqlite3
 # --------------------------------------------------------------------------------
-
 
 import logging
 import re
-from .db import Database
+import sqlite3
 
 # 以字母开头，只能包含字母、数字和下划线，长度大于1小于254个字符
 re_field = re.compile(r'^[a-zA-Z]\w*')
@@ -65,6 +80,86 @@ def format_fields(fields_str, fields):
     return fmt_str
 
 
+class Connect(object):
+    dbname = None
+
+    @classmethod
+    def connect(cls):
+        try:
+            if cls.dbname is None:
+                raise ValueError('数据库文件未设置')
+            conn = sqlite3.connect(cls.dbname)
+            return conn
+        except sqlite3.OperationalError as e:
+            raise sqlite3.OperationalError('数据库连接失败：%s' % e)
+
+    @classmethod
+    def execute_ddl(cls, sql=None):
+        if sql is None:
+            raise ValueError('sql执行语句为空')
+        conn = cls.connect()
+        cur = conn.cursor()
+        logging.info('[ %s ]' % sql)
+        try:
+            cur.execute(sql)
+        except sqlite3.OperationalError as e:
+            cur.close()
+            conn.close()
+            raise sqlite3.OperationalError('执行SQL失败：%s' % e)
+        cur.close()
+        conn.close()
+
+    @classmethod
+    def execute_dml(cls, sql=None, args=None):
+        conn = cls.connect()
+        cur = conn.cursor()
+        logging.info('[ %s %s ]' % (sql, args))
+        try:
+            cur.execute(sql, args)
+        except sqlite3.OperationalError as e:
+            conn.rollback()
+            cur.close()
+            conn.close()
+            raise sqlite3.OperationalError('数据库执行失败：%s' % e)
+        conn.commit()
+        cur.close()
+        conn.close()
+        return cur.rowcount
+
+    @classmethod
+    def execute_query(cls, sql=None, args=None, limit=None, offset=None):
+        if isinstance(limit, int) and limit < 1:
+            raise ValueError('查询条数不能小于1')
+        if not isinstance(limit, int) and limit:
+            raise ValueError('参数limit类型非法')
+
+        if isinstance(offset, int) and offset < 0:
+            raise ValueError('跳过条数不能小于0')
+        if not isinstance(offset, int) and offset:
+            raise ValueError('参数offset类型非法')
+
+        if offset and limit is None:
+            raise ValueError('跳过条数不为空时，查询条数不能为空')
+
+        if limit:
+            sql = '%s limit %d' % (sql, limit)
+        if offset:
+            sql = '%s offset %d' % (sql, offset)
+        logging.info('[ %s %s ]' % (sql, args))
+        conn = Connect.connect()
+        cur = conn.cursor()
+        try:
+            cur.execute(sql, args)
+        except sqlite3.OperationalError as e:
+            cur.close()
+            conn.close()
+            raise sqlite3.OperationalError('[ 数据库执行失败：%s ]' % e)
+        rest = cur.fetchall()
+        cur.close()
+        conn.close()
+        return rest
+
+
 class Field(object):
     def __init__(self, field_name, field_type, primary_key, default):
         self.field_name = field_name
@@ -73,14 +168,13 @@ class Field(object):
         self.default = default
 
 
-class Varchar(Field):
+class String(Field):
     def __init__(self, field_name=None, primary_key=False, default=None, length=100):
-        super().__init__(field_name, 'varchar(%d)' % length, primary_key, default)
-
-
-class Char(Field):
-    def __init__(self, field_name=None, primary_key=False, default=None, length=100):
-        super().__init__(field_name, 'char(%d)' % length, primary_key, default)
+        if length < 1:
+            raise ValueError('字段长度不能小于1')
+        if length > 4000:
+            raise ValueError('字段长度不能超过4000')
+        super().__init__(field_name, 'varchar(%s)' % length, primary_key, default)
 
 
 class Text(Field):
@@ -88,53 +182,13 @@ class Text(Field):
         super().__init__(field_name, 'text', primary_key, default)
 
 
-class Date(Field):
-    def __init__(self, field_name=None, primary_key=False, default=None):
-        super().__init__(field_name, 'date', primary_key, default)
-
-
-class Time(Field):
-    def __init__(self, field_name=None, primary_key=False, default=None):
-        super().__init__(field_name, 'time', primary_key, default)
-
-
-class Timestamp(Field):
-    def __init__(self, field_name=None, primary_key=False, default=None):
-        super().__init__(field_name, 'timestamp', primary_key, default)
-
-
-class Smallint(Field):
-    def __init__(self, field_name=None, primary_key=False, default=0):
-        super().__init__(field_name, 'smallint', primary_key, default)
-
-
 class Integer(Field):
-    def __init__(self, field_name=None, primary_key=False, default=0):
-        super().__init__(field_name, 'integer', primary_key, default)
-
-
-class Bigint(Field):
     def __init__(self, field_name=None, primary_key=False, default=0):
         super().__init__(field_name, 'bigint', primary_key, default)
 
 
-class Money(Field):
-    def __init__(self, field_name=None, primary_key=False, default=0.00):
-        super().__init__(field_name, 'money', primary_key, default)
-
-
-class Numeric(Field):
-    def __init__(self, field_name=None, primary_key=False, default=0.0, length=10, precision=2):
-        super().__init__(field_name, 'numeric(%d,%d)' %(length, precision), primary_key, default)
-
-
-class Double(Field):
-    def __init__(self, field_name=None, primary_key=False, default=0.00):
-        super().__init__(field_name, 'double precision', primary_key, default)
-
-
-class Real(Field):
-    def __init__(self, field_name=None, primary_key=False, default=0.00):
+class Float(Field):
+    def __init__(self, field_name=None, primary_key=False, default=0.0):
         super().__init__(field_name, 'real', primary_key, default)
 
 
@@ -200,23 +254,23 @@ class Model(dict, metaclass=ModelMetaclass):
         super().__init__(**kwargs)
 
     @classmethod
-    async def chain(cls, where=None, args=None):
-        rest = await cls.read(where=where, args=args, limit=1)
+    def chain(cls, where=None, args=None):
+        rest = cls.read(where=where, args=args, limit=1)
         if rest:
             return rest[0]
         else:
             return None
 
     @classmethod
-    async def count(cls, where=None, args=None):
+    def count(cls, where=None, args=None):
         sql = cls.__count__
         args = format_args(where, args)
         if where:
             sql += ' where ' + where
-        return await Database.select(sql=sql, args=args, limit=1)[0][0]
+        return Connect.execute_query(sql, args, 1)[0][0]
 
     @classmethod
-    async def read(cls, where=None, args=None, order=None, limit=None, offset=None):
+    def read(cls, where=None, args=None, order=None, limit=None, offset=None):
         sql = cls.__select__
         args = format_args(where, args)
         if where:
@@ -224,7 +278,7 @@ class Model(dict, metaclass=ModelMetaclass):
         if order:
             sql += ' order by ' + format_fields(order, cls.__fields__)
         rset = []
-        async for row in Database.select(sql, args, limit, offset):
+        for row in Connect.execute_query(sql, args, limit, offset):
             rs = {}
             pos = 0
             for value in row:
@@ -237,7 +291,7 @@ class Model(dict, metaclass=ModelMetaclass):
 
             return rset
 
-    async def save(self):
+    def save(self):
         mapping = self.__mapping__
         sql = self.__insert__
         args = []
@@ -247,9 +301,9 @@ class Model(dict, metaclass=ModelMetaclass):
             else:
                 args.append(mapping[field].default)
         args = tuple(args)
-        return await Database.change(sql, args)
+        return Connect.execute_dml(sql, args)
 
-    async def update(self, where, args):
+    def update(self, where, args):
         args = format_args(where, args)
         sql = self.__update__
         sql += ','.join('[%s]=?' % key for key in self.keys())
@@ -258,25 +312,25 @@ class Model(dict, metaclass=ModelMetaclass):
         argsset = tuple(argsset)
         if where:
             sql += ' where %s ' % format_fields(where, self.__fields__)
-        return await Database.change(sql, argsset)
+        return Connect.execute_dml(sql, argsset)
 
     @classmethod
-    async def delete(cls, where=None, args=None):
+    def delete(cls, where=None, args=None):
         sql = cls.__delete__
         args = format_args(where, args)
         if where:
             sql += ' where %s' % format_fields(where, cls.__fields__)
-        return await Database.change(sql, args)
+        return Connect.execute_dml(sql, args)
 
     @classmethod
-    async def create(cls):
+    def create(cls):
         sql = cls.__create__
-        await Database.change(sql)
+        Connect.execute_ddl(sql)
 
     @classmethod
-    async def drop(cls):
+    def drop(cls):
         sql = cls.__drop__
-        await Database.change(sql)
+        Connect.execute_ddl(sql)
 
     def __getattr__(self, key):
         try:
