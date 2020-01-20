@@ -41,6 +41,10 @@ class Database(object):
         if db.dbtype == 'postgresql':
             cls.pool.close()
             await cls.pool.wait_closed()
+            cls.pool = None
+            cls.conn = None
+            cls.cursor = None
+            cls.tran = None
         else:
             raise ValueError('数据库类型支持：postgresql')
 
@@ -92,7 +96,7 @@ async def begin():
         Database.conn = await Database.pool.acquire()
         Database.cursor = await Database.conn.cursor()
         Database.tran = Transaction(Database.cursor, IsolationLevel.read_committed)
-        await Database.tran.begin()
+        Database.tran = await Database.tran.begin()
     else:
         raise psycopg2.ProgrammingError('有未提交的事务')
 
@@ -100,8 +104,9 @@ async def commit():
     if isinstance(Database.tran, Transaction):
         await Database.tran.commit()
         Database.tran = None
-        await Database.cursor.close()
-        await Database.conn.close()
+        Database.cursor.close()
+        Database.pool.release(Database.conn)
+        Database.conn.close()
     else:
         raise psycopg2.ProgrammingError('事务提交异常')
 
@@ -109,7 +114,8 @@ async def rollback():
     if isinstance(Database.tran, Transaction):
         await Database.tran.rollback()
         Database.tran = None
-        await Database.cursor.close()
-        await Database.conn.close()
+        Database.cursor.close()
+        Database.pool.release(Database.conn)
+        Database.conn.close()
     else:
         raise psycopg2.ProgrammingError('事务回滚异常')

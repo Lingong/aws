@@ -168,12 +168,11 @@ class ModelMetaclass(type):
             attrs.pop(key)
 
         str_fields = ','.join(
-            ['[%s]' % mapping[field].field_name for field in fields])
+            ['%s' % mapping[field].field_name for field in fields])
         str_values = ','.join(['?'] * len(mapping))
         str_create = ','.join(
-            ['[%s] %s' % (field, mapping[field].field_type) for field in fields])
-        str_keys = ','.join(
-            ['[%s]' % primarykey for primarykey in primarykeys])
+            ['%s %s' % (field, mapping[field].field_type) for field in fields])
+        str_keys = ','.join(['%s' % primarykey for primarykey in primarykeys])
 
         if len(primarykeys) == 0:
             attrs['__primary_key__'] = None
@@ -183,15 +182,15 @@ class ModelMetaclass(type):
         attrs['__table__'] = tablename
         attrs['__fields__'] = fields
         attrs['__default__'] = default
-        attrs['__select__'] = 'select %s from [%s] ' % (str_fields, tablename)
-        attrs['__insert__'] = 'insert into [%s](%s) values(%s)' % (
+        attrs['__select__'] = 'select %s from %s ' % (str_fields, tablename)
+        attrs['__insert__'] = 'insert into %s(%s) values(%s)' % (
             tablename, str_fields, str_values)
-        attrs['__update__'] = 'update [%s] set ' % tablename
-        attrs['__delete__'] = 'delete from [%s]' % tablename
-        attrs['__create__'] = 'create table [%s](%s,primary key(%s))' % (
+        attrs['__update__'] = 'update %s set ' % tablename
+        attrs['__delete__'] = 'delete from %s' % tablename
+        attrs['__create__'] = 'create table %s(%s,primary key(%s))' % (
             tablename, str_create, str_keys)
-        attrs['__drop__'] = 'drop table [%s]' % tablename
-        attrs['__count__'] = 'select count(*) from [%s] ' % tablename
+        attrs['__drop__'] = 'drop table %s' % tablename
+        attrs['__count__'] = 'select count(*) from %s ' % tablename
         return type.__new__(cls, name, base, attrs)
 
 

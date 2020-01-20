@@ -1,4 +1,6 @@
 __pycache__/
+.idea/
+.vscode/
 data
 static
 index.html

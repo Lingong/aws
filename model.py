@@ -2,14 +2,14 @@ from datetime import datetime
 
 from web.orm import Model, Varchar
 
-class User(Model):
-    __table__ = 'user'
+class Account(Model):
+    __table__ = 'account'
     # 用户ID
     uid = Varchar(primary_key=True, length=20)
     # 密码 md5密文
     password = Varchar(length=32)
     # 用户组
-    group = Varchar(length=20)
+    usergroup = Varchar(length=20)
     # 名字
     name = Varchar(length=100)
 

@@ -1,7 +1,7 @@
 import asyncio
 from web import db
 from web import config
-from model import User
+from model import Account
 
 # 管理dsn
 admin_dsn = {
@@ -27,14 +27,13 @@ user_dsn = {
   'maxsize': 10
 }
 
-def get_config(dsn):
+def load_config(dsn):
   conf = config.getConfig(dsn)
   app = dict()
   app['db'] = conf
   return app
 
-async def setup_db():
-  dbconf = get_config(admin_dsn)
+async def setup_db(dbconf):
   await db.Database.init_db(dbconf)
   sql = 'drop database if exists %s' %user_dsn['dbname']
   await db.Database.change(sql=sql)
@@ -45,20 +44,27 @@ async def setup_db():
   await db.Database.change(sql=sql)
   await db.Database.close_db(dbconf)
 
-async def create_tables():
-  dbconf = get_config(user_dsn)
-  tables = [User]
+async def create_tables(dbconf):
+  await db.Database.init_db(dbconf)
+  await db.begin()
+  tables = [Account]
   print('-   创建表成功: ')
   for table in tables:
     print('-               %s' %table)
     await table.create()
+  await db.commit()
+  await db.Database.close_db(dbconf)
   
 async def main():
   print('---------------- 安装开始 ---------------')
+  print('- 0.导入配置...')
+  adminconf = load_config(admin_dsn)
+  userconf = load_config(user_dsn)
+  print('-   导入配置成功')
   print('- 1.数据库初始化...')
-  await setup_db()
+  await setup_db(adminconf)
   print('- 2.创建表...')
-  await create_tables()
+  await create_tables(userconf)
   # await db.begin()
   # result = await db.Database.change(sql=sql)
   # print(result)
