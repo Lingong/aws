@@ -24,14 +24,18 @@ class Database(object):
     conn = None
     cursor = None
     tran = None
+    # 占位符
+    flag = '%s'
 
     @classmethod
     async def init_db(cls, app):
         db = app['db']
         if db.dbtype == 'postgresql':
+            cls.flag = '%s'
             dsn = 'dbname=%s user=%s password=%s host=%s port=%d' %(
                 db.dbname, db.user, db.password, db.host, db.port)
             cls.pool = await aiopg.create_pool(dsn=dsn, minsize=db.minsize, maxsize=db.maxsize)
+
         else:
             raise ValueError('数据库类型支持：postgresql')
     
