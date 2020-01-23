@@ -24,33 +24,7 @@ class Database(object):
     conn = None
     cursor = None
     tran = None
-    # 占位符
     flag = '%s'
-
-    @classmethod
-    async def init_db(cls, app):
-        db = app['db']
-        if db.dbtype == 'postgresql':
-            cls.flag = '%s'
-            dsn = 'dbname=%s user=%s password=%s host=%s port=%d' %(
-                db.dbname, db.user, db.password, db.host, db.port)
-            cls.pool = await aiopg.create_pool(dsn=dsn, minsize=db.minsize, maxsize=db.maxsize)
-
-        else:
-            raise ValueError('数据库类型支持：postgresql')
-    
-    @classmethod
-    async def close_db(cls, app):
-        db = app['db']
-        if db.dbtype == 'postgresql':
-            cls.pool.close()
-            await cls.pool.wait_closed()
-            cls.pool = None
-            cls.conn = None
-            cls.cursor = None
-            cls.tran = None
-        else:
-            raise ValueError('数据库类型支持：postgresql')
 
     @classmethod
     async def change(cls, sql=None, args=None):
@@ -61,12 +35,12 @@ class Database(object):
         if cls.tran is None:
             async with cls.pool.acquire() as conn:
                 async with conn.cursor() as cursor:
-                    await cursor.execute(sql)
+                    await cursor.execute(sql, args)
                     return cursor.rowcount
         else:
             if cls.cursor is None:
                 raise psycopg2.ProgrammingError('数据库异常,游标为空')
-            await cls.cursor.execute(sql)
+            await cls.cursor.execute(sql, args)
             return cls.cursor.rowcount
 
     @classmethod
@@ -80,10 +54,8 @@ class Database(object):
             raise ValueError('跳过条数不能小于0')
         if not isinstance(offset, int) and offset:
             raise ValueError('参数offset类型非法')
-
         if offset and limit is None:
             raise ValueError('跳过条数不为空时，查询条数不能为空')
-
         if limit:
             sql = '%s limit %d' % (sql, limit)
         if offset:
@@ -94,6 +66,25 @@ class Database(object):
                 await cursor.execute(sql, args)
                 rest = await cursor.fetchall()
         return rest
+
+async def init_db(config):
+    if config['dbtype'] == 'postgresql':
+        dsn = 'dbname=%s user=%s password=%s host=%s port=%d' % (
+            config['dbname'], config['user'], config['password'], config['host'], config['port'])
+        Database.pool = await aiopg.create_pool(dsn=dsn, minsize=config['minsize'], maxsize=config['maxsize'])
+    else:
+        raise ValueError('数据库类型支持：postgresql')
+
+async def close_db(config):
+    if config['dbtype'] == 'postgresql':
+        Database.pool.close()
+        await Database.pool.wait_closed()
+        Database.pool = None
+        Database.conn = None
+        Database.cursor = None
+        Database.tran = None
+    else:
+        raise ValueError('数据库类型支持：postgresql')
 
 async def begin():
     if Database.tran is None:

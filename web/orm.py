@@ -37,11 +37,11 @@ def format_args(where, args):
         raise ValueError('查询条件为空，参数也必须为空')
 
     if where:
-        count = where.count(Database.flag)
+        count = where.count('?')
         if count == 0:
-            raise ValueError('查询条件中必须有%s占位符' % Database.flag)
+            raise ValueError('查询条件中必须有?占位符')
         elif count != len(args):
-            raise ValueError('查询条件中站位符%s与参数个数不符' % Database.flag)
+            raise ValueError('查询条件中站位符?与参数个数不符')
 
     return args
 
@@ -167,7 +167,6 @@ class ModelMetaclass(type):
             attrs.pop(key)
 
         str_fields = ','.join(['%s' % mapping[field].field_name for field in fields])
-        print(Database.flag)
         str_values = ','.join([Database.flag] * len(mapping))
         # 加工create语句
         list_create = []
@@ -203,7 +202,7 @@ class Model(dict, metaclass=ModelMetaclass):
         super().__init__(**kwargs)
 
     @classmethod
-    async def chain(cls, where=None, args=None):
+    async def chain(cls, where=None, args:list=None):
         rest = await cls.read(where=where, args=args, limit=1)
         if rest:
             return rest[0]
@@ -220,7 +219,7 @@ class Model(dict, metaclass=ModelMetaclass):
         return result[0][0]
 
     @classmethod
-    async def read(cls, where=None, args=None, order=None, limit=None, offset=None):
+    async def read(cls, where=None, args:list=None, order=None, limit=None, offset=None):
         sql = cls.__select__
         args = format_args(where, args)
         if where:
@@ -228,7 +227,8 @@ class Model(dict, metaclass=ModelMetaclass):
         if order:
             sql += ' order by ' + format_fields(order, cls.__fields__)
         rset = []
-        async for row in Database.select(sql, args, limit, offset):
+        rows = await Database.select(sql, args, limit, offset)
+        for row in rows:
             rs = {}
             pos = 0
             for value in row:

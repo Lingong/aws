@@ -18,13 +18,6 @@ user_dsn = {
 }
 
 
-def load_config(dsn):
-    conf = config.getConfig(dsn)
-    app = dict()
-    app['db'] = conf
-    return app
-
-
 async def setup_db():
     dsn = 'dbname=postgres user=lg password=a1s2d3 host=localhost port=5432'
     async with aiopg.connect(dsn) as conn:
@@ -39,8 +32,7 @@ async def setup_db():
 
 
 async def create_tables():
-    dbconf = load_config(user_dsn)
-    await db.Database.init_db(dbconf)
+    await db.init_db(user_dsn)
     await db.begin()
     tables = [Account, Usergroup, Mail, Filelist, Filelog]
     print('-   创建表成功: ')
@@ -48,12 +40,11 @@ async def create_tables():
         print('-               %s' % table)
         await table.create()
     await db.commit()
-    await db.Database.close_db(dbconf)
+    await db.close_db(user_dsn)
 
 
 async def init_data():
-    dbconf = load_config(user_dsn)
-    await db.Database.init_db(dbconf)
+    await db.init_db(user_dsn)
     await db.begin()
     print('-   初始化表：account')
     password = 'admin-abc123..'
@@ -64,17 +55,36 @@ async def init_data():
     account.password = passwd_md5
     account.usergroup = 'admin'
     await account.save()
-    print('-   初始化表：Group')
+    print('-   初始化表：usergroup')
     usergroup = Usergroup()
     usergroup.gid = 'admin'
     usergroup.role = 'admin'
     usergroup.name = '管理员'
     await usergroup.save()
-    # conn.execute(Group.insert().values(gid='core',role='user',name='核心组'))
-    # conn.execute(Group.insert().values(gid='front',role='user',name='前置组'))
-    # conn.execute(Group.insert().values(gid='manger',role='user',name='管理组'))
-    # conn.execute(Group.insert().values(gid='chanle',role='user',name='渠道组'))
-    # conn.execute(Group.insert().values(gid='public',role='user',name='公共'))
+    usergroup.gid = 'core'
+    usergroup.role = 'user'
+    usergroup.name = '核心组'
+    await usergroup.save()
+    usergroup.gid = 'front'
+    usergroup.role = 'user'
+    usergroup.name = '前置组'
+    await usergroup.save()
+    usergroup.gid = 'manger'
+    usergroup.role = 'user'
+    usergroup.name = '管理组'
+    await usergroup.save()
+    usergroup.gid = 'chanle'
+    usergroup.role = 'user'
+    usergroup.name = '渠道组'
+    await usergroup.save()
+    usergroup.gid = 'public'
+    usergroup.role = 'user'
+    usergroup.name = '公共'
+    await usergroup.save()
+    await db.commit()
+    rows = await Usergroup.read(where='gid=%s', args=['public'])
+    print(rows)
+    await db.close_db(user_dsn)
 
 
 async def main():
